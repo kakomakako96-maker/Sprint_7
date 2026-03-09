@@ -1,106 +1,108 @@
+import io.qameta.allure.Description;
+import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
-import io.restassured.response.Response;
-import jdk.jfr.Description;
-import org.example.Courier;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.example.*;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
-import java.io.File;
-
-import static io.restassured.RestAssured.expect;
+import static org.hamcrest.Matchers.equalTo;
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.*;
-import static org.mockito.BDDMockito.then;
 
-public class CourierTest {
+public class NewCourierTest {
 
-    private final String testLogin = "Katya";
-    private final String testPassword = "1234";
-    private final String testFirstName = "March";
+    private String testLogin = "Katya";
+    private String testPassword = "1234";
+    private String testFirstName = "March";
 
     @BeforeEach
     public void setUp() {
-        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru/";
+        RestAssured.baseURI = "https://qa-scooter.praktikum-services.ru";
     }
 
     @AfterEach
     void tearDown() {
         //Узнаем id курьера
-        String json = given()
+        LoginCourier courier = new LoginCourier(testLogin, testPassword);
+        var response = given()
                 .contentType(ContentType.JSON)
-                .body("{\"login\": \"" + testLogin + "\", \"password\": \"" + testPassword + "\"}")
+                .body(courier)
                 .when()
-                .post("/api/v1/courier/login")
-                .then()
-                .statusCode(200)
-                .extract()
-                .asString();
+                .post("/api/v1/courier/login");
 
-        //Оставляем только номер
-        String id = json.replaceAll("[^\\d]", "");
+        if (response.statusCode() == 200) {
+            String id = response.then().extract().path("id").toString();
 
-        //Удаляем курьера
-        given()
-                .pathParams("id", id)
-                .when()
-                .delete("/api/v1/courier/{id}")
-                .then()
-                .statusCode(200);
+            //Удаляем курьера
+            given()
+                    .pathParam("id", id)
+                    .when()
+                    .delete("/api/v1/courier/{id}")
+                    .then()
+                    .statusCode(200);
+        }
     }
 
-    @Description("Создаем курьера")
+    @DisplayName("Создание курьеров")
+    @Description("Проверка, что нельзя создать двух одинаковых курьеров")
     @Test
-    void createCourier() {
-        Courier courier = new Courier(testLogin, testPassword, testFirstName);
+    void createCourierTesting() {
+        createCourier();
+        createDubleCourier();
+    }
+
+    @DisplayName("Проверка заполнения полей")
+    @Description("Проверка, чтобы создать курьера, нужно передать в ручку все обязательные поля")
+    @ParameterizedTest
+    @CsvSource({
+            "Katya, , March",
+            " , 1234, March"
+    })
+    public void createBoxCourier(String testLogin, String testPassword, String testFirstName) {
+        createCourierOneBox(testLogin, testPassword, testFirstName);
+    }
+
+    @Step("Создание курьера - ожидание 201")
+    public void createCourier() {
+        NewCourier courier = new NewCourier(testLogin, testPassword, testFirstName);
         given()
                 .contentType(ContentType.JSON)
                 .body(courier)
                 .when()
                 .post("/api/v1/courier")
                 .then()
+                .log().ifError()
                 .statusCode(201)
                 .body("ok", equalTo(true));
     }
 
-    @Description("Проверка, что нельзя создать двух одинаковых курьеров")
-    @Test
-    void createTwoCourier() {
-        Courier courierOne = new Courier(testLogin, testPassword, testFirstName);
-        given()
-                .contentType(ContentType.JSON)
-                .body(courierOne)
-                .when()
-                .post("/api/v1/courier")
-                .then()
-                .statusCode(201)
-                .body("ok", equalTo(true));
-
-        Courier courierTwo = new Courier(testLogin, testPassword, testFirstName);
+    @Step("Создание дубликата курьера - ожидание 409")
+    public void createDubleCourier() {
+        NewCourier courierTwo = new NewCourier(testLogin, testPassword, testFirstName);
         given()
                 .contentType(ContentType.JSON)
                 .body(courierTwo)
                 .when()
                 .post("/api/v1/courier")
                 .then()
+                .log().ifError()
                 .statusCode(409)
                 .body("message", equalTo("Этот логин уже используется. Попробуйте другой."));
     }
 
-    @Description("чтобы создать курьера, нужно передать в ручку все обязательные поля")
-    @Test
-    void createCourierOneBox() {
-
+    @Step("Создаем курьера с одним заполненным полем - ожидание 400")
+    public void createCourierOneBox(String testLogin, String testPassword, String testFirstName) {
+        NewCourier courier = new NewCourier(testLogin, testPassword, testFirstName);
         given()
                 .contentType(ContentType.JSON)
-                .body("{\"login\": \"" + testLogin + "\"}")
+                .body(courier)
                 .when()
                 .post("/api/v1/courier")
                 .then()
+                .log().ifError()
                 .statusCode(400)
                 .body("message", equalTo("Недостаточно данных для создания учетной записи"));
-    }
 
+    }
 }
