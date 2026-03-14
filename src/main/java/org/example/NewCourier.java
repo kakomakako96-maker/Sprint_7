@@ -12,4 +12,5 @@ public class NewCourier {
         this.password = password;
         this.firstName = firstName;
     }
+    public NewCourier(){}
 }

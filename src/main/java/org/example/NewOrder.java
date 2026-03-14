@@ -27,7 +27,7 @@ public class NewOrder {
         this.comment = comment;
     }
 
-    public NewOrder(String name, String firstName, String lastName, String address, String metroStation, String phone, String rentTime, String deliveryDate, String comment, String color) {
+    public NewOrder(String name, String firstName, String lastName, String address, String metroStation, String phone, String rentTime, String deliveryDate, String comment, String[] color) {
         this.name = name;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -37,6 +37,6 @@ public class NewOrder {
         this.rentTime = rentTime;
         this.deliveryDate = deliveryDate;
         this.comment = comment;
-        this.color = new String[]{color};
+        this.color = color;
     }
 }
